@@ -8,13 +8,20 @@ export async function parseScheduleWithGemini(input, apiKey, model = CONFIG.DEFA
     throw new Error('Gemini API key is not configured in js/config.js. Please paste your key into js/config.js to enable AI extraction.');
   }
 
-  // Support both string input or object input { text, imageBase64, imageMimeType }
+  // Support string input or object input { text, images: [{ base64, mimeType }], imageBase64, imageMimeType }
   const naturalText = typeof input === 'string' ? input : (input.text || '');
-  const imageBase64 = typeof input === 'object' ? input.imageBase64 : null;
-  const imageMimeType = typeof input === 'object' ? input.imageMimeType : 'image/jpeg';
+  
+  let images = [];
+  if (typeof input === 'object') {
+    if (Array.isArray(input.images) && input.images.length > 0) {
+      images = input.images;
+    } else if (input.imageBase64) {
+      images = [{ base64: input.imageBase64, mimeType: input.imageMimeType || 'image/jpeg' }];
+    }
+  }
 
-  if (!naturalText.trim() && !imageBase64) {
-    throw new Error('Please enter some text or upload an image of your schedule.');
+  if (!naturalText.trim() && images.length === 0) {
+    throw new Error('Please enter notes or attach a schedule photo.');
   }
 
   // Cascade list: try default model, then fallbacks
@@ -26,7 +33,7 @@ export async function parseScheduleWithGemini(input, apiKey, model = CONFIG.DEFA
   for (const currentModel of modelsToTry) {
     try {
       console.log(`[Sked AI] Analyzing schedule with model: ${currentModel}...`);
-      return await executeGeminiRequest({ naturalText, imageBase64, imageMimeType }, activeKey, currentModel);
+      return await executeGeminiRequest({ naturalText, images }, activeKey, currentModel);
     } catch (err) {
       lastError = err;
       const msg = (err.message || '').toLowerCase();
@@ -53,7 +60,7 @@ export async function parseScheduleWithGemini(input, apiKey, model = CONFIG.DEFA
   throw lastError || new Error('Failed to analyze schedule with Gemini.');
 }
 
-async function executeGeminiRequest({ naturalText, imageBase64, imageMimeType }, apiKey, model) {
+async function executeGeminiRequest({ naturalText, images = [] }, apiKey, model) {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
 
   // Current local time reference for relative calculations
@@ -131,11 +138,16 @@ Return ONLY a valid JSON object matching this schema:
 
   const parts = [];
 
-  if (imageBase64) {
-    parts.push({
-      inlineData: {
-        mimeType: imageMimeType || 'image/jpeg',
-        data: imageBase64
+  // Support multiple images
+  if (Array.isArray(images) && images.length > 0) {
+    images.forEach(img => {
+      if (img.base64) {
+        parts.push({
+          inlineData: {
+            mimeType: img.mimeType || 'image/jpeg',
+            data: img.base64
+          }
+        });
       }
     });
   }
@@ -147,13 +159,16 @@ Return ONLY a valid JSON object matching this schema:
 
   const clockBanner = `[REFERENCE CLOCK CONTEXT: Today is ${currentDayName} (${currentDayCode}), ${currentDateStr}. Local Time is ${currentTime24} (Timezone: ${userTimezone}). Tomorrow is ${tomorrowDayName} (${tomorrowDayCode}). If input uses relative time like "2 hours from now", "in 45 mins", "in 2 hours", "tomorrow at 3pm", calculate the exact startTime and day based on this reference clock.]`;
 
+  const hasImages = Array.isArray(images) && images.length > 0;
+  const imageCountText = images.length > 1 ? `${images.length} attached schedule photos/screenshots` : 'the attached schedule photo/screenshot';
+
   let promptText = '';
   if (naturalText && naturalText.trim()) {
-    promptText = imageBase64 
-      ? `${clockBanner}\n\nAnalyze this schedule input along with the attached timetable image and extract all events into the requested JSON schema:\n\n"""\n${naturalText.trim()}\n"""`
+    promptText = hasImages 
+      ? `${clockBanner}\n\nAnalyze this schedule input along with ${imageCountText} and extract all events into the requested JSON schema:\n\n"""\n${naturalText.trim()}\n"""`
       : `${clockBanner}\n\nAnalyze the following schedule input and extract all events into the requested JSON schema:\n\n"""\n${naturalText.trim()}\n"""`;
   } else {
-    promptText = `${clockBanner}\n\nCarefully inspect and transcribe all classes, routines, deadlines, and appointments from this timetable/schedule image into the requested JSON schema.`;
+    promptText = `${clockBanner}\n\nCarefully inspect and transcribe all classes, routines, deadlines, and appointments from ${imageCountText} into the requested JSON schema.`;
   }
 
   parts.push({ text: promptText });

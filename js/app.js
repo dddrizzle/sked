@@ -13,8 +13,7 @@ class SkedApp {
     this.activeTab = 'weekly';
 
     // Image state
-    this.currentImageBase64 = null;
-    this.currentImageMimeType = null;
+    this.uploadedImages = []; // Array of { id, name, size, type, base64, dataUrl }
 
     this.initElements();
     this.initTheme();
@@ -29,7 +28,6 @@ class SkedApp {
     this.formLogin = document.getElementById('form-login');
     this.loginUsernameInput = document.getElementById('login-username-input');
     this.loginErrorMsg = document.getElementById('login-error-msg');
-    this.btnQuickLogins = document.querySelectorAll('.btn-quick-login');
 
     // 2. Main App View Elements
     this.appView = document.getElementById('app-view');
@@ -42,13 +40,10 @@ class SkedApp {
     this.btnClearPrompt = document.getElementById('btn-clear-prompt');
     this.checkboxAppendMode = document.getElementById('checkbox-append-mode');
     
+    this.promptBoxContainer = document.getElementById('prompt-box-container');
+    this.imagePreviewsList = document.getElementById('image-previews-list');
+    this.btnAttachImage = document.getElementById('btn-attach-image');
     this.imageFileInput = document.getElementById('image-file-input');
-    this.imageDropzone = document.getElementById('image-dropzone');
-    this.imagePreviewContainer = document.getElementById('image-preview-container');
-    this.imagePreviewImg = document.getElementById('image-preview-img');
-    this.imagePreviewName = document.getElementById('image-preview-name');
-    this.imagePreviewSize = document.getElementById('image-preview-size');
-    this.btnRemoveImage = document.getElementById('btn-remove-image');
 
     // Header Controls
     this.btnThemeToggle = document.getElementById('btn-theme-toggle');
@@ -80,8 +75,20 @@ class SkedApp {
     this.btnExportIcs = document.getElementById('btn-export-ics');
     this.btnExportCsv = document.getElementById('btn-export-csv');
     this.btnClearAll = document.getElementById('btn-clear-all');
+
+    // JSON Actions
     this.btnCopyJson = document.getElementById('btn-copy-json');
     this.btnDownloadJson = document.getElementById('btn-download-json');
+
+    // Feedback / Suggestion Elements
+    this.btnFeedbackFab = document.getElementById('btn-feedback-fab');
+    this.modalFeedback = document.getElementById('modal-feedback');
+    this.formFeedback = document.getElementById('form-feedback');
+    this.btnCloseFeedbackModal = document.getElementById('btn-close-feedback-modal');
+    this.btnCancelFeedback = document.getElementById('btn-cancel-feedback');
+    this.btnSubmitFeedback = document.getElementById('btn-submit-feedback');
+    this.feedbackType = document.getElementById('feedback-type');
+    this.feedbackMessage = document.getElementById('feedback-message');
   }
 
   initTheme() {
@@ -101,90 +108,128 @@ class SkedApp {
   }
 
   initImageUpload() {
-    this.imageDropzone.addEventListener('click', () => {
-      this.imageFileInput.click();
-    });
-
-    this.imageDropzone.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        this.imageFileInput.click();
-      }
-    });
-
-    this.imageFileInput.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        this.processUploadedFile(file);
-      }
-    });
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      this.imageDropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.imageDropzone.classList.add('drag-active');
+    if (this.btnAttachImage) {
+      this.btnAttachImage.addEventListener('click', () => {
+        if (this.imageFileInput) this.imageFileInput.click();
       });
-    });
+    }
 
-    ['dragleave', 'drop'].forEach(eventName => {
-      this.imageDropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.imageDropzone.classList.remove('drag-active');
+    if (this.imageFileInput) {
+      this.imageFileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length > 0) {
+          this.processUploadedFiles(files);
+        }
+        this.imageFileInput.value = '';
       });
-    });
+    }
 
-    this.imageDropzone.addEventListener('drop', (e) => {
-      const file = e.dataTransfer?.files?.[0];
-      if (file) {
-        this.processUploadedFile(file);
-      }
-    });
+    if (this.promptBoxContainer) {
+      ['dragenter', 'dragover'].forEach(eventName => {
+        this.promptBoxContainer.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.promptBoxContainer.classList.add('drag-active');
+        });
+      });
 
-    this.btnRemoveImage.addEventListener('click', () => {
-      this.clearUploadedImage();
-    });
+      ['dragleave', 'drop'].forEach(eventName => {
+        this.promptBoxContainer.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.promptBoxContainer.classList.remove('drag-active');
+        });
+      });
+
+      this.promptBoxContainer.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
+        if (files.length > 0) {
+          this.processUploadedFiles(files);
+        } else if (e.dataTransfer?.files?.length > 0) {
+          this.showToast('Please upload image files (PNG, JPG, WEBP).', 'error');
+        }
+      });
+    }
   }
 
-  processUploadedFile(file) {
-    if (!file.type.startsWith('image/')) {
-      this.showToast('Please upload an image file (PNG, JPG, WEBP)', 'error');
+  processUploadedFiles(files) {
+    let addedCount = 0;
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        this.showToast(`Skipped non-image file: ${file.name}`, 'error');
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        this.showToast(`Image "${file.name}" exceeds 10MB limit.`, 'error');
+        continue;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const resultStr = reader.result;
+        const base64 = resultStr.split(',')[1];
+        const newImg = {
+          id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          base64: base64,
+          dataUrl: resultStr
+        };
+        this.uploadedImages.push(newImg);
+        this.renderImagePreviews();
+      };
+      reader.onerror = () => {
+        this.showToast(`Failed to read ${file.name}`, 'error');
+      };
+      reader.readAsDataURL(file);
+      addedCount++;
+    }
+
+    if (addedCount > 0) {
+      this.showToast(`Attached ${addedCount} photo${addedCount > 1 ? 's' : ''}.`, 'success');
+    }
+  }
+
+  renderImagePreviews() {
+    if (!this.imagePreviewsList) return;
+
+    if (this.uploadedImages.length === 0) {
+      this.imagePreviewsList.style.display = 'none';
+      this.imagePreviewsList.innerHTML = '';
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      this.showToast('Image size exceeds 10MB limit.', 'error');
-      return;
-    }
+    this.imagePreviewsList.style.display = 'flex';
+    this.imagePreviewsList.innerHTML = '';
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const resultStr = reader.result;
-      this.currentImageBase64 = resultStr.split(',')[1];
-      this.currentImageMimeType = file.type;
+    this.uploadedImages.forEach(img => {
+      const chip = document.createElement('div');
+      chip.className = 'image-chip';
+      chip.innerHTML = `
+        <img src="${img.dataUrl}" alt="${this.escape(img.name)}" class="image-chip-thumb" />
+        <span class="image-chip-name" title="${this.escape(img.name)}">${this.escape(img.name)}</span>
+        <button type="button" class="btn-chip-remove" title="Remove image">&times;</button>
+      `;
 
-      this.imagePreviewImg.src = resultStr;
-      this.imagePreviewName.textContent = file.name;
-      this.imagePreviewSize.textContent = this.formatFileSize(file.size);
+      chip.querySelector('.btn-chip-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.removeUploadedImage(img.id);
+      });
 
-      this.imageDropzone.style.display = 'none';
-      this.imagePreviewContainer.style.display = 'flex';
-      this.showToast('Image attached. Ready to analyze.', 'success');
-    };
-    reader.onerror = () => {
-      this.showToast('Failed to read image file.', 'error');
-    };
-    reader.readAsDataURL(file);
+      this.imagePreviewsList.appendChild(chip);
+    });
   }
 
-  clearUploadedImage() {
-    this.currentImageBase64 = null;
-    this.currentImageMimeType = null;
-    this.imageFileInput.value = '';
-    this.imagePreviewImg.src = '';
-    this.imagePreviewContainer.style.display = 'none';
-    this.imageDropzone.style.display = 'flex';
+  removeUploadedImage(id) {
+    this.uploadedImages = this.uploadedImages.filter(img => img.id !== id);
+    this.renderImagePreviews();
+  }
+
+  clearUploadedImages() {
+    this.uploadedImages = [];
+    if (this.imageFileInput) this.imageFileInput.value = '';
+    this.renderImagePreviews();
   }
 
   formatFileSize(bytes) {
@@ -210,16 +255,6 @@ class SkedApp {
       } else {
         this.clearLoginError();
       }
-    });
-
-    // Quick Login buttons (drizzle and admin)
-    this.btnQuickLogins.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const user = btn.dataset.user;
-        this.loginUsernameInput.value = user;
-        this.clearLoginError();
-        this.executeLogin(user);
-      });
     });
 
     // Logout / Switch User
@@ -334,6 +369,15 @@ class SkedApp {
       exportToJson(this.events, `sked-${this.currentUser}-data.json`);
       this.showToast('JSON file downloaded.', 'success');
     });
+
+    // Feedback Modal Open / Close
+    this.btnFeedbackFab?.addEventListener('click', () => this.openFeedbackModal());
+    this.btnCloseFeedbackModal?.addEventListener('click', () => this.closeFeedbackModal());
+    this.btnCancelFeedback?.addEventListener('click', () => this.closeFeedbackModal());
+    this.modalFeedback?.addEventListener('click', (e) => {
+      if (e.target === this.modalFeedback) this.closeFeedbackModal();
+    });
+    this.formFeedback?.addEventListener('submit', (e) => this.handleSubmitFeedback(e));
   }
 
   // ==================== AUTHENTICATION & LOGIN LOGIC ====================
@@ -413,7 +457,7 @@ class SkedApp {
     Storage.clearCurrentUser();
     this.currentUser = null;
     this.events = [];
-    this.clearUploadedImage();
+    this.clearUploadedImages();
     this.showLoginView();
     this.showToast('Logged out.', 'success');
   }
@@ -466,10 +510,10 @@ class SkedApp {
 
   async handleGenerate() {
     const text = this.promptInput.value.trim();
-    const hasImage = !!this.currentImageBase64;
+    const hasImages = this.uploadedImages.length > 0;
 
-    if (!text && !hasImage) {
-      this.showToast('Please type notes or upload a schedule image first.', 'error');
+    if (!text && !hasImages) {
+      this.showToast('Please type schedule notes or attach photos first.', 'error');
       this.promptInput.focus();
       return;
     }
@@ -479,14 +523,16 @@ class SkedApp {
     try {
       const inputPayload = {
         text,
-        imageBase64: this.currentImageBase64,
-        imageMimeType: this.currentImageMimeType
+        images: this.uploadedImages.map(img => ({
+          base64: img.base64,
+          mimeType: img.type
+        }))
       };
 
       const extractedEvents = await parseScheduleWithGemini(inputPayload);
 
       if (!extractedEvents || extractedEvents.length === 0) {
-        this.showToast('No events could be detected. Try phrasing with days/times or upload a clearer image.', 'error');
+        this.showToast('No events could be detected. Try phrasing with days/times or attach clearer photos.', 'error');
       } else {
         const isAppendMode = this.checkboxAppendMode ? this.checkboxAppendMode.checked : true;
 
@@ -495,14 +541,14 @@ class SkedApp {
           this.showToast(`Added ${extractedEvents.length} items (${this.events.length} total).`, 'success');
         } else {
           this.events = extractedEvents;
-          this.showToast(`Loaded ${extractedEvents.length} new items for ${this.currentUser}.`, 'success');
+          this.showToast(`Loaded ${extractedEvents.length} items for ${this.currentUser}.`, 'success');
         }
 
         this.persistEvents();
         this.renderAllViews();
 
         this.promptInput.value = '';
-        this.clearUploadedImage();
+        this.clearUploadedImages();
       }
     } catch (err) {
       console.error(err);
@@ -742,6 +788,55 @@ class SkedApp {
     const synced = await Storage.syncToCloud(this.currentUser, this.events);
     if (synced) {
       this.showToast('Changes saved to cloud.', 'success');
+    }
+  }
+
+  // ==================== FEEDBACK / SUGGESTION MODAL ====================
+
+  openFeedbackModal() {
+    this.modalFeedback?.classList.add('open');
+    setTimeout(() => this.feedbackMessage?.focus(), 150);
+  }
+
+  closeFeedbackModal() {
+    this.modalFeedback?.classList.remove('open');
+  }
+
+  async handleSubmitFeedback(e) {
+    e.preventDefault();
+    const msg = this.feedbackMessage.value.trim();
+    if (!msg) {
+      this.showToast('Please type a message before sending.', 'error');
+      return;
+    }
+
+    const type = this.feedbackType.value;
+    const username = this.currentUser || 'Anonymous';
+
+    this.btnSubmitFeedback.disabled = true;
+    this.btnSubmitFeedback.innerHTML = '<span class="spinner"></span> <span>Sending...</span>';
+
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, type, message: msg })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to send feedback.');
+      }
+
+      this.closeFeedbackModal();
+      this.formFeedback.reset();
+      this.showToast('Your suggestion was sent directly to Discord! Thank you!', 'success');
+    } catch (err) {
+      console.error(err);
+      this.showToast(err.message || 'Error sending to Discord.', 'error');
+    } finally {
+      this.btnSubmitFeedback.disabled = false;
+      this.btnSubmitFeedback.innerHTML = '<span>Send to Discord</span>';
     }
   }
 

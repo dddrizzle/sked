@@ -234,9 +234,15 @@ export function renderAgenda(events, containerEl, options = {}) {
     return;
   }
 
-  const daysOrder = weekStart === 'Sun' ? ALL_DAYS_SUN : ALL_DAYS_MON;
+  const standardWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const todayIndex = new Date().getDay();
-  const todayCode = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][todayIndex];
+  const todayCode = standardWeek[todayIndex];
+
+  // Daily Agenda starts with current day at the very top, and continues in chronological order
+  const daysOrder = [];
+  for (let i = 0; i < 7; i++) {
+    daysOrder.push(standardWeek[(todayIndex + i) % 7]);
+  }
 
   const agendaWrapper = document.createElement('div');
   agendaWrapper.className = 'agenda-wrapper';
@@ -248,12 +254,13 @@ export function renderAgenda(events, containerEl, options = {}) {
 
     if (dayEvents.length === 0) return;
 
+    const isToday = day === todayCode;
     const daySection = document.createElement('div');
-    daySection.className = `agenda-day-section ${day === todayCode ? 'is-today' : ''}`;
+    daySection.className = `agenda-day-section ${isToday ? 'is-today' : ''}`;
 
     daySection.innerHTML = `
       <div class="agenda-day-header">
-        <h4>${DAY_LABELS[day]}</h4>
+        <h4>${DAY_LABELS[day]} ${isToday ? '<span class="agenda-today-pill">Today</span>' : ''}</h4>
         <span class="agenda-day-count">${dayEvents.length} ${dayEvents.length === 1 ? 'item' : 'items'}</span>
       </div>
       <div class="agenda-events-list"></div>

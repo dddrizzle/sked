@@ -19,8 +19,8 @@ const DEFAULT_SETTINGS = {
 
 export const Storage = {
   getCurrentUser() {
-    // Return null by default so user is always presented with login screen if not logged in
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || null;
+    // Always show login screen upon opening site and on refresh
+    return null;
   },
 
   setCurrentUser(username) {

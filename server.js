@@ -1,6 +1,11 @@
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+import http from 'http';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
 
@@ -58,6 +63,84 @@ const server = http.createServer((req, res) => {
       });
       return;
     }
+  }
+
+  // API endpoint for suggestions (forwards to Discord)
+  if (parsedUrl.pathname === '/api/feedback') {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body);
+        const { username, type, message } = payload || {};
+        if (!message || !message.trim()) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Message is required' }));
+          return;
+        }
+
+        const webhookUrl = process.env.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1555612420209119413/iidcmn2G24X22q9P1l-CO8o4TwfD99cgTiwSmg-HT1Lfv-5LMv_QugC58y9Aarfs167h';
+        const colorMap = {
+          'Suggestion': 0x6366f1,
+          'Bug Report': 0xf43f5e,
+          'UI Idea': 0x06b6d4,
+          'General': 0x10b981
+        };
+        const embedColor = colorMap[type] || 0x6366f1;
+
+        const discordBody = JSON.stringify({
+          username: 'Sked Feedback',
+          avatar_url: 'https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f4dd.png',
+          embeds: [
+            {
+              title: `New ${type || 'Suggestion'}`,
+              color: embedColor,
+              fields: [
+                { name: '👤 User', value: username ? `\`${username}\`` : 'Anonymous', inline: true },
+                { name: '📌 Category', value: type || 'Suggestion', inline: true },
+                { name: '💬 Message', value: message.trim() }
+              ],
+              footer: { text: 'Sked App Feedback' },
+              timestamp: new Date().toISOString()
+            }
+          ]
+        });
+
+        const discordReq = https.request(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(discordBody)
+          }
+        }, (discordRes) => {
+          if (discordRes.statusCode >= 200 && discordRes.statusCode < 300) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+          } else {
+            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: `Discord status ${discordRes.statusCode}` }));
+          }
+        });
+
+        discordReq.on('error', (err) => {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+        });
+
+        discordReq.write(discordBody);
+        discordReq.end();
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      }
+    });
+    return;
   }
 
   let reqUrl = parsedUrl.pathname;
