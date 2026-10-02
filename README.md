@@ -66,25 +66,21 @@ export const CONFIG = {
 
 ---
 
-## Deploying to GitHub Pages (Access From Any Device)
+## Cloud Deployment & Cross-Device Sync (Cloudflare Pages + KV)
 
-Because Sked is built with zero-dependency modern web standards, you can host it for free on GitHub Pages and open it from your phone, laptop, or any other device:
+Sked is deployed on **Cloudflare Pages** connected to your private GitHub repository with cross-device sync powered by **Cloudflare KV**:
 
-1. In your terminal in this project folder:
-   ```bash
-   git init
-   git add .
-   git commit -m "Deploy Sked AI Timetable"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/<your-repo-name>.git
-   git push -u origin main
-   ```
+1. **Continuous Deployment via GitHub**:
+   - Push updates to `main`:
+     ```bash
+     git add .
+     git commit -m "Update schedule features"
+     git push origin main
+     ```
+   - Cloudflare Pages runs `npm run build` and automatically deploys the updated app in seconds.
 
-2. Open your GitHub repository in your browser:
-   - Go to **Settings** -> **Pages** (in the left sidebar).
-   - Under **Build and deployment** -> **Source**, select **Deploy from a branch**.
-   - Under **Branch**, select `main` and folder `/ (root)`.
-   - Click **Save**.
+2. **Cross-Device Cloud Sync**:
+   - Backed by Cloudflare KV (`SKED_KV` namespace binding).
+   - Your schedules automatically sync across all your devices (phone, tablet, laptop) using your username.
+   - Works offline and falls back seamlessly to local browser cache when disconnected.
 
-3. In ~60 seconds, your site will be live at:
-   `https://<your-username>.github.io/<your-repo-name>/`
