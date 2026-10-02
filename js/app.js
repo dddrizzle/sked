@@ -371,7 +371,7 @@ class SkedApp {
     this.showToast(`Logged in as ${cleanUser}`, 'success');
   }
 
-  loadUserSession(username) {
+  async loadUserSession(username) {
     this.currentUser = username;
     const rawEvents = Storage.getUserSchedule(username);
     this.events = rawEvents.map((ev, idx) => ({
@@ -389,6 +389,18 @@ class SkedApp {
     this.appView.style.display = 'block';
 
     this.renderAllViews();
+
+    // Background Cloud Sync (Cloudflare KV)
+    try {
+      const cloudEvents = await Storage.fetchCloudSchedule(username);
+      if (cloudEvents && Array.isArray(cloudEvents) && cloudEvents.length > 0) {
+        this.events = cloudEvents;
+        Storage.setUserSchedule(username, cloudEvents);
+        this.renderAllViews();
+      }
+    } catch {
+      // Operates in offline/local mode if KV binding is not yet attached
+    }
   }
 
   logout() {
@@ -721,6 +733,7 @@ class SkedApp {
 
   persistEvents() {
     Storage.setUserSchedule(this.currentUser, this.events);
+    Storage.syncToCloud(this.currentUser, this.events);
   }
 
   showToast(message, type = 'success') {

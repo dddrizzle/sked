@@ -97,6 +97,41 @@ export const Storage = {
     }
   },
 
+  async fetchCloudSchedule(username) {
+    if (!username) return null;
+    const user = username.trim();
+    try {
+      const res = await fetch(`/api/schedule?user=${encodeURIComponent(user)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data.map((e, idx) => ({
+          ...e,
+          id: e.id ? String(e.id) : `evt_${user}_${Date.now()}_${idx}`,
+          recurring: e.recurring !== undefined ? Boolean(e.recurring) : true,
+          isDeadline: Boolean(e.isDeadline)
+        }));
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  async syncToCloud(username, events) {
+    if (!username || !Array.isArray(events)) return;
+    const user = username.trim();
+    try {
+      await fetch(`/api/schedule?user=${encodeURIComponent(user)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(events)
+      });
+    } catch {
+      // LocalStorage preserves data if cloud or KV is temporarily unavailable
+    }
+  },
+
   getTheme() {
     return localStorage.getItem(STORAGE_KEYS.THEME) || 'dark';
   },

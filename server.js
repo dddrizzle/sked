@@ -16,7 +16,51 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-  let reqUrl = req.url.split('?')[0];
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
+
+  // API endpoint for schedule persistence (simulates Cloudflare KV locally)
+  if (parsedUrl.pathname === '/api/schedule') {
+    const user = parsedUrl.searchParams.get('user');
+    if (!user) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing user query parameter' }));
+      return;
+    }
+
+    const localDataDir = path.join(__dirname, '.local_data');
+    if (!fs.existsSync(localDataDir)) fs.mkdirSync(localDataDir, { recursive: true });
+    const userFilePath = path.join(localDataDir, `user_${user.trim()}.json`);
+
+    if (req.method === 'GET') {
+      if (fs.existsSync(userFilePath)) {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+        fs.createReadStream(userFilePath).pipe(res);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('null');
+      }
+      return;
+    }
+
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          JSON.parse(body); // validate
+          fs.writeFileSync(userFilePath, body, 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, user }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+  }
+
+  let reqUrl = parsedUrl.pathname;
   let filePath = path.join(__dirname, reqUrl === '/' ? 'index.html' : reqUrl);
 
   const ext = path.extname(filePath).toLowerCase();
