@@ -393,10 +393,16 @@ class SkedApp {
     // Background Cloud Sync (Cloudflare KV)
     try {
       const cloudEvents = await Storage.fetchCloudSchedule(username);
-      if (cloudEvents && Array.isArray(cloudEvents) && cloudEvents.length > 0) {
+      if (cloudEvents && Array.isArray(cloudEvents)) {
         this.events = cloudEvents;
         Storage.setUserSchedule(username, cloudEvents);
         this.renderAllViews();
+        this.showToast(`Cloud synced: ${cloudEvents.length} items loaded.`, 'success');
+      } else {
+        // If cloud is empty, seed it with the starter schedule so other devices get it
+        if (this.events && this.events.length > 0) {
+          Storage.syncToCloud(username, this.events);
+        }
       }
     } catch {
       // Operates in offline/local mode if KV binding is not yet attached
@@ -731,9 +737,12 @@ class SkedApp {
     }
   }
 
-  persistEvents() {
+  async persistEvents() {
     Storage.setUserSchedule(this.currentUser, this.events);
-    Storage.syncToCloud(this.currentUser, this.events);
+    const synced = await Storage.syncToCloud(this.currentUser, this.events);
+    if (synced) {
+      this.showToast('Changes saved to cloud.', 'success');
+    }
   }
 
   showToast(message, type = 'success') {

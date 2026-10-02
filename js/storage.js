@@ -101,9 +101,15 @@ export const Storage = {
     if (!username) return null;
     const user = username.trim();
     try {
+      console.log(`[Sked Cloud] Checking cloud schedule for user: "${user}"...`);
       const res = await fetch(`/api/schedule?user=${encodeURIComponent(user)}`);
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[Sked Cloud] Cloud returned status ${res.status}:`, errText);
+        return null;
+      }
       const data = await res.json();
+      console.log(`[Sked Cloud] Data received from cloud:`, data);
       if (Array.isArray(data)) {
         return data.map((e, idx) => ({
           ...e,
@@ -113,22 +119,32 @@ export const Storage = {
         }));
       }
       return null;
-    } catch {
+    } catch (err) {
+      console.warn(`[Sked Cloud] Network error fetching cloud data:`, err);
       return null;
     }
   },
 
   async syncToCloud(username, events) {
-    if (!username || !Array.isArray(events)) return;
+    if (!username || !Array.isArray(events)) return false;
     const user = username.trim();
     try {
-      await fetch(`/api/schedule?user=${encodeURIComponent(user)}`, {
+      console.log(`[Sked Cloud] Saving ${events.length} events to cloud for "${user}"...`);
+      const res = await fetch(`/api/schedule?user=${encodeURIComponent(user)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(events)
       });
-    } catch {
-      // LocalStorage preserves data if cloud or KV is temporarily unavailable
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[Sked Cloud] Failed to save (${res.status}):`, errText);
+        return false;
+      }
+      console.log(`[Sked Cloud] Successfully synced to Cloudflare KV for "${user}"!`);
+      return true;
+    } catch (err) {
+      console.warn(`[Sked Cloud] Network error syncing to cloud:`, err);
+      return false;
     }
   },
 
