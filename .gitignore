@@ -18,3 +18,8 @@ desktop.ini
 .idea/
 *.sublime-project
 *.sublime-workspace
+
+# Build & deployment artifacts
+dist/
+*.zip
+
