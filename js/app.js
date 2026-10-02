@@ -830,13 +830,13 @@ class SkedApp {
 
       this.closeFeedbackModal();
       this.formFeedback.reset();
-      this.showToast('Your suggestion was sent directly to Discord! Thank you!', 'success');
+      this.showToast('Your feedback has been submitted! Thank you!', 'success');
     } catch (err) {
       console.error(err);
-      this.showToast(err.message || 'Error sending to Discord.', 'error');
+      this.showToast(err.message || 'Error submitting feedback.', 'error');
     } finally {
       this.btnSubmitFeedback.disabled = false;
-      this.btnSubmitFeedback.innerHTML = '<span>Send to Discord</span>';
+      this.btnSubmitFeedback.innerHTML = '<span>Submit Feedback</span>';
     }
   }
 

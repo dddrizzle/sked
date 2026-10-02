@@ -1512,6 +1512,24 @@ body {
   border-color: var(--accent-primary);
 }
 
+select.form-control {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 14px;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
+
+select.form-control option {
+  background: var(--bg-secondary);
+  color: var(--text-main);
+  padding: 0.5rem;
+}
+
 .day-checkboxes {
   display: flex;
   flex-wrap: wrap;
@@ -1887,11 +1905,30 @@ body {
 }
 
 .feedback-textarea {
-  resize: vertical;
-  min-height: 90px;
-  max-height: 240px;
+  resize: none;
+  min-height: 100px;
   font-family: inherit;
   line-height: 1.5;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.feedback-textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.feedback-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.feedback-textarea::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-full);
+}
+
+.feedback-textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
 }
 
 @media (max-width: 520px) {
