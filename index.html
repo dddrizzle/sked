@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sked — Multilingual AI Timetable & Schedule Graphic Generator</title>
+  <meta name="description" content="Convert natural language notes and schedule screenshots directly into structured schedules, visual timetable graphics, and calendar exports.">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- html2canvas for high-res PNG graphic export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+  <!-- ==================== 1. LOGIN SCREEN (ENTRY GATE) ==================== -->
+  <div id="login-view" class="login-view-wrapper">
+    <div class="login-card">
+      <div class="login-brand-header">
+        <div class="login-logo-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </div>
+        <h1 class="login-app-title">Sked</h1>
+        <p class="login-app-subtitle">Multilingual AI Timetable & Schedule Generator</p>
+      </div>
+
+      <div class="login-body">
+        <div class="login-prompt-heading">
+          <h3>Welcome</h3>
+          <p>Please enter your username to view or manage your schedule.</p>
+        </div>
+
+        <!-- Username Form -->
+        <form id="form-login" class="login-form">
+          <div class="form-group">
+            <label for="login-username-input">Username</label>
+            <div class="login-input-wrapper">
+              <input 
+                type="text" 
+                id="login-username-input" 
+                class="form-control login-input" 
+                placeholder="e.g. drizzle, admin, Alex" 
+                autocomplete="username" 
+                maxlength="30"
+                required
+              >
+            </div>
+            <div id="login-error-msg" class="login-error-msg" style="display: none;"></div>
+            <span class="login-hint">
+              Case-sensitive. Only letters and numbers allowed (no spaces or special characters).
+            </span>
+          </div>
+
+          <button type="submit" id="btn-login-submit" class="btn-primary btn-login-submit">
+            <span>Enter Timetable</span>
+          </button>
+        </form>
+
+        <!-- Quick Select Defaults -->
+        <div class="login-defaults-section">
+          <div class="login-divider">
+            <span>or select a profile</span>
+          </div>
+          <div class="login-defaults-grid">
+            <button type="button" class="btn-quick-login" data-user="drizzle">
+              <div class="quick-meta">
+                <span class="quick-title">drizzle</span>
+                <span class="quick-desc">Student / Personal schedule</span>
+              </div>
+            </button>
+            <button type="button" class="btn-quick-login" data-user="admin">
+              <div class="quick-meta">
+                <span class="quick-title">admin</span>
+                <span class="quick-desc">Operations / Work schedule</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== 2. MAIN APPLICATION VIEW ==================== -->
+  <div id="app-view" class="app-view-wrapper" style="display: none;">
+    
+    <!-- App Header -->
+    <header class="app-header">
+      <div class="header-container">
+        <div class="brand-wrapper">
+          <div class="logo-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title">Sked</h1>
+            <div class="brand-subtitle">Natural Language & Vision to Timetable Graphics</div>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <!-- Personalized User Badge -->
+          <div class="user-profile-badge">
+            <span class="user-label-text">Profile:</span>
+            <strong id="current-username-display" class="user-badge-name"></strong>
+          </div>
+
+          <!-- Switch / Log Out Button -->
+          <button id="btn-logout" class="btn-header btn-logout" title="Switch User or Log Out">
+            <span>Switch User</span>
+          </button>
+
+          <!-- Theme Toggle (Only Emoji Allowed) -->
+          <button id="btn-theme-toggle" class="btn-header" title="Toggle Dark/Light Mode">
+            <span id="theme-icon">🌙</span>
+          </button>
+
+          <!-- New Event Button -->
+          <button id="btn-add-event" class="btn-header btn-add-event">
+            <span>+ Add Event</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="main-layout">
+
+      <!-- Input Section: Natural Language & Image Prompt -->
+      <section class="prompt-panel">
+        <div class="prompt-header">
+          <div class="prompt-title">
+            <span>Schedule Input</span>
+            <span class="prompt-multilingual-hint">(Text notes, screenshots, deadlines, or one-time events)</span>
+          </div>
+          <button type="button" id="btn-clear-prompt" class="btn-clear-input" title="Clear text input">Clear Text</button>
+        </div>
+
+        <!-- Image Upload Area -->
+        <div class="image-upload-wrapper">
+          <input type="file" id="image-file-input" accept="image/*" style="display: none;">
+          
+          <div id="image-dropzone" class="image-dropzone" role="button" tabindex="0">
+            <div class="dropzone-content">
+              <div class="dropzone-icon-badge">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+              </div>
+              <div class="dropzone-text">
+                <span class="dropzone-main-text">Upload or Drop Schedule Screenshot / Photo</span>
+                <span class="dropzone-sub-text">Class timetable, syllabus photo, calendar image, or matriculation sheet</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Uploaded Image Thumbnail Preview -->
+          <div id="image-preview-container" class="image-preview-container" style="display: none;">
+            <div class="image-preview-left">
+              <img id="image-preview-img" class="image-preview-img" alt="Schedule preview">
+              <div class="image-preview-meta">
+                <span id="image-preview-name" class="image-preview-name">schedule.png</span>
+                <span id="image-preview-size" class="image-preview-size">0 KB</span>
+              </div>
+            </div>
+            <button type="button" id="btn-remove-image" class="btn-remove-image" title="Remove Image">Remove</button>
+          </div>
+        </div>
+
+        <!-- Text Area Input -->
+        <div class="prompt-textarea-wrapper">
+          <textarea 
+            id="prompt-input" 
+            class="prompt-textarea" 
+            placeholder="Type or paste notes (optional if image attached), e.g.:
+• Gym MWF 7am-8:30am
+• Calculus 101 Tue/Thu 10am-12pm in Room 304
+• Final Essay Deadline this Friday at 11:59pm
+• Doctor appointment next Tuesday at 2pm"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <!-- Controls & Append Mode Toggle -->
+        <div class="prompt-controls">
+          <div class="prompt-controls-left">
+            <label class="append-mode-label" title="Keep existing events and add new ones (overlapping allowed)">
+              <input type="checkbox" id="checkbox-append-mode" checked>
+              <span class="append-switch"></span>
+              <span class="append-text">
+                <strong>Add to current schedule</strong> (preserves existing & allows overlaps)
+              </span>
+            </label>
+          </div>
+
+          <button id="btn-generate" class="btn-generate">
+            <span class="btn-text">Analyze & Add to Timetable</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Schedule & Graphics Display Section -->
+      <section class="schedule-container">
+        <div class="schedule-topbar">
+          
+          <!-- View Switcher Tabs -->
+          <div class="view-tabs">
+            <button class="tab-btn active" data-tab="weekly">
+              <span>Weekly Timetable</span>
+            </button>
+            <button class="tab-btn" data-tab="agenda">
+              <span>Daily Agenda</span>
+            </button>
+            <button class="tab-btn" data-tab="table">
+              <span>Manageable Data</span>
+            </button>
+            <button class="tab-btn" data-tab="json">
+              <span>Raw JSON</span>
+            </button>
+          </div>
+
+          <!-- Schedule Action Suite -->
+          <div class="schedule-actions">
+            <button id="btn-export-png" class="btn-action primary" title="Download High-Resolution PNG Graphic">
+              <span>Export Graphic (PNG)</span>
+            </button>
+            <button id="btn-export-ics" class="btn-action" title="Export .ics for Google / Apple Calendar">
+              <span>Calendar (.ics)</span>
+            </button>
+            <button id="btn-export-csv" class="btn-action" title="Export to CSV">
+              <span>CSV</span>
+            </button>
+            <button id="btn-clear-all" class="btn-action" title="Reset all schedule events for this user">
+              <span>Reset Schedule</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 1: Weekly Timetable Grid -->
+        <div id="view-weekly" class="view-content tab-content active">
+          <div id="timetable-mount"></div>
+        </div>
+
+        <!-- Tab 2: Daily Agenda -->
+        <div id="view-agenda" class="view-content tab-content" style="display: none;">
+          <div id="agenda-mount"></div>
+        </div>
+
+        <!-- Tab 3: Manageable Data Table -->
+        <div id="view-table" class="view-content tab-content" style="display: none;">
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Days / Date</th>
+                  <th>Time</th>
+                  <th>Category</th>
+                  <th>Location</th>
+                  <th>Notes</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="data-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 4: Raw JSON Viewer -->
+        <div id="view-json" class="view-content tab-content" style="display: none;">
+          <div class="json-viewer-container">
+            <div class="json-viewer-header">
+              <span style="font-size: 0.85rem; color: var(--text-muted);">Structured JSON format:</span>
+              <div style="display: flex; gap: 0.5rem;">
+                <button id="btn-copy-json" class="btn-action">Copy JSON</button>
+                <button id="btn-download-json" class="btn-action">Download .json</button>
+              </div>
+            </div>
+            <pre id="json-code-box" class="json-code-box"></pre>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Event Add / Edit Modal -->
+  <div id="modal-event" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-event-title">Edit Event</h3>
+        <button id="btn-close-event-modal" class="modal-close">&times;</button>
+      </div>
+      <form id="form-event" class="modal-body">
+        <input type="hidden" id="event-id">
+
+        <div class="form-group">
+          <label for="event-title-input">Event Title *</label>
+          <input type="text" id="event-title-input" class="form-control" required placeholder="e.g. Calculus 101, Gym, Project Due">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label for="event-repeat-type">Task Frequency</label>
+            <select id="event-repeat-type" class="form-control">
+              <option value="weekly">Weekly Recurring</option>
+              <option value="onetime">One-Time Event</option>
+              <option value="deadline">Deadline / Submission</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="group-event-date">
+            <label for="event-date">Specific Date (Optional)</label>
+            <input type="date" id="event-date" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group" id="group-event-days">
+          <label>Days of Week *</label>
+          <div class="day-checkboxes">
+            <label class="day-checkbox-label"><input type="checkbox" name="event-day" value="Mon"> Mon</label>
+            <label class="day-checkbox-label"><input type="checkbox" name="event-day" value="Tue"> Tue</label>
+            <label class="day-checkbox-label"><input type="checkbox" name="event-day" value="Wed"> Wed</label>
+            <label class="day-checkbox-label"><input type="checkbox" name="event-day" value="Thu"> Thu</label>
+            <label class="day-checkbox-label"><input type="checkbox" name="event-day" value="Fri"> Fri</label>
+            <label class="day-checkbox-label"><input type="checkbox" name="event-day" value="Sat"> Sat</label>
+            <label class="day-checkbox-label"><input type="checkbox" name="event-day" value="Sun"> Sun</label>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label for="event-start-time">Start Time *</label>
+            <input type="time" id="event-start-time" class="form-control" required value="09:00">
+          </div>
+          <div class="form-group">
+            <label for="event-end-time">End Time *</label>
+            <input type="time" id="event-end-time" class="form-control" required value="10:00">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label for="event-category">Category</label>
+            <select id="event-category" class="form-control">
+              <option value="Academic">Academic</option>
+              <option value="Fitness">Fitness</option>
+              <option value="Work">Work</option>
+              <option value="Study">Study</option>
+              <option value="Personal">Personal</option>
+              <option value="Social">Social</option>
+              <option value="Chore">Chore</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="event-color">Color</label>
+            <input type="color" id="event-color" class="form-control" value="#6366f1" style="height: 42px; padding: 2px 4px; cursor: pointer;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="event-location">Location / Room</label>
+          <input type="text" id="event-location" class="form-control" placeholder="e.g. Room 304, Campus Gym, Zoom">
+        </div>
+
+        <div class="form-group">
+          <label for="event-notes">Notes / Details</label>
+          <input type="text" id="event-notes" class="form-control" placeholder="e.g. Prof. Miller, Section A">
+        </div>
+
+        <div class="modal-footer" style="margin-top: 1rem;">
+          <button type="button" id="btn-delete-modal-event" class="btn-delete-modal" style="display: none;">Delete Event</button>
+          <button type="button" id="btn-cancel-event" class="btn-secondary">Cancel</button>
+          <button type="submit" class="btn-primary">Save Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- App Main Entry Point (ES Module) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

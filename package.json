@@ -1,0 +1,14 @@
+{
+  "name": "sked",
+  "version": "1.0.0",
+  "description": "Smart Multilingual AI Timetable & Schedule Graphic Generator",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "type": "module",
+  "keywords": ["scheduler", "timetable", "ai", "gemini", "github-pages"],
+  "author": "",
+  "license": "MIT"
+}
