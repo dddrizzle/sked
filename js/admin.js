@@ -1,7 +1,7 @@
 // Sked Admin Console - System Diagnostics, AI Status, User Manager, and Feedback Hub
 import { Storage } from './storage.js';
 import { CONFIG } from './config.js';
-import { DEFAULT_ADMIN_SCHEDULE, DEFAULT_DRIZZLE_SCHEDULE, DEFAULT_XYZ_SCHEDULE } from './samples.js';
+import { DEFAULT_ADMIN_SCHEDULE, DEFAULT_DRIZZLE_SCHEDULE } from './samples.js';
 
 export class AdminDashboard {
   constructor(appInstance) {
@@ -661,8 +661,7 @@ export class AdminDashboard {
       const name = prompt('Enter a new username to create or seed with starter schedule:');
       if (name && name.trim()) {
         const clean = name.trim();
-        const seedSchedule = clean === 'xyz' ? DEFAULT_XYZ_SCHEDULE : DEFAULT_DRIZZLE_SCHEDULE;
-        Storage.setUserSchedule(clean, seedSchedule);
+        Storage.setUserSchedule(clean, DEFAULT_DRIZZLE_SCHEDULE);
         this.app.showToast(`User '${clean}' created with starter schedule.`, 'success');
         this.renderCurrentTab();
       }
@@ -703,8 +702,6 @@ export class AdminDashboard {
         if (confirm(`Are you sure you want to reset schedule data for user "${user}"?`)) {
           if (user === 'drizzle') {
             Storage.setUserSchedule('drizzle', DEFAULT_DRIZZLE_SCHEDULE);
-          } else if (user === 'xyz') {
-            Storage.setUserSchedule('xyz', DEFAULT_XYZ_SCHEDULE);
           } else if (user === 'admin') {
             Storage.setUserSchedule('admin', DEFAULT_ADMIN_SCHEDULE);
           } else {

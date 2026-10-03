@@ -427,12 +427,12 @@ class SkedApp {
       if (this.loginPasscodeGroup) this.loginPasscodeGroup.style.display = 'block';
       const enteredPasscode = this.loginPasscodeInput ? this.loginPasscodeInput.value : '';
       if (!enteredPasscode) {
-        this.showLoginError('Admin passcode is required. (Default: skedadmin)');
+        this.showLoginError('Admin passcode is required.');
         this.loginPasscodeInput?.focus();
         return;
       }
       if (!Storage.validateAdminPasscode(enteredPasscode)) {
-        this.showLoginError('Incorrect admin passcode. Try default "skedadmin".');
+        this.showLoginError('Incorrect admin passcode.');
         this.loginPasscodeInput?.focus();
         return;
       }
@@ -490,8 +490,8 @@ class SkedApp {
         this.renderAllViews();
         this.showToast(`Cloud synced: ${cloudEvents.length} items loaded.`, 'success');
       } else {
-        // If cloud is empty, seed it with the starter schedule so other devices get it
-        if (this.events && this.events.length > 0) {
+        // If cloud is empty, seed it with the starter schedule so other devices get it (only system starters)
+        if (this.events && this.events.length > 0 && (username === 'admin' || username === 'drizzle')) {
           Storage.syncToCloud(username, this.events);
         }
       }

@@ -1,6 +1,6 @@
 // LocalStorage and App State Management with Case-Sensitive Multi-User Support
 
-import { DEFAULT_DRIZZLE_SCHEDULE, DEFAULT_ADMIN_SCHEDULE, DEFAULT_XYZ_SCHEDULE } from './samples.js';
+import { DEFAULT_DRIZZLE_SCHEDULE, DEFAULT_ADMIN_SCHEDULE } from './samples.js';
 import { CONFIG } from './config.js';
 
 const STORAGE_KEYS = {
@@ -84,20 +84,11 @@ export const Storage = {
       console.error(`Error loading schedule for ${user}`, e);
     }
 
-    // Default starter schedules for exact 'drizzle', 'xyz', and 'admin'
+    // Default starter schedules for exact 'drizzle' and 'admin'
     if (user === 'drizzle') {
       return DEFAULT_DRIZZLE_SCHEDULE.map((e, idx) => ({
         ...e,
         id: `drizzle_${idx + 1}`,
-        recurring: true,
-        isDeadline: false,
-        url: e.url ? String(e.url).trim() : ''
-      }));
-    }
-    if (user === 'xyz') {
-      return DEFAULT_XYZ_SCHEDULE.map((e, idx) => ({
-        ...e,
-        id: `xyz_${idx + 1}`,
         recurring: true,
         isDeadline: false,
         url: e.url ? String(e.url).trim() : ''
