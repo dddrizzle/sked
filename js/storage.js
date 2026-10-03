@@ -1,6 +1,3 @@
-// LocalStorage and App State Management with Case-Sensitive Multi-User Support
-
-import { DEFAULT_DRIZZLE_SCHEDULE, DEFAULT_ADMIN_SCHEDULE } from './samples.js';
 import { CONFIG } from './config.js';
 
 const STORAGE_KEYS = {
@@ -12,17 +9,6 @@ const STORAGE_KEYS = {
   FEEDBACK_LOG: 'sked_feedback_log',
   DELETED_USERS: 'sked_deleted_users'
 };
-
-const DEFAULT_FEEDBACK = [
-  {
-    id: 'fb-seed-dobs',
-    username: 'dobs',
-    type: 'Suggestion',
-    message: 'schedules on the calendar could include redirects to pdf,docs or submissions bins',
-    timestamp: 'Today at 2:47 PM',
-    status: 'Planned'
-  }
-];
 
 const DEFAULT_SETTINGS = {
   timeFormat: '12h',
@@ -44,8 +30,16 @@ export const Storage = {
     }
     // Case-sensitive, trimmed, sanitized
     const cleanUser = username.trim();
+    this.undeleteUser(cleanUser);
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, cleanUser);
     return cleanUser;
+  },
+
+  undeleteUser(username) {
+    if (!username) return;
+    const user = username.trim();
+    const deleted = this.getDeletedUsers().filter(u => u !== user);
+    localStorage.setItem(STORAGE_KEYS.DELETED_USERS, JSON.stringify(deleted));
   },
 
   clearCurrentUser() {
@@ -84,25 +78,6 @@ export const Storage = {
       console.error(`Error loading schedule for ${user}`, e);
     }
 
-    // Default starter schedules for exact 'drizzle' and 'admin'
-    if (user === 'drizzle') {
-      return DEFAULT_DRIZZLE_SCHEDULE.map((e, idx) => ({
-        ...e,
-        id: `drizzle_${idx + 1}`,
-        recurring: true,
-        isDeadline: false,
-        url: e.url ? String(e.url).trim() : ''
-      }));
-    }
-    if (user === 'admin') {
-      return DEFAULT_ADMIN_SCHEDULE.map((e, idx) => ({
-        ...e,
-        id: `admin_${idx + 1}`,
-        recurring: true,
-        isDeadline: false,
-        url: e.url ? String(e.url).trim() : ''
-      }));
-    }
     return [];
   },
 
@@ -337,24 +312,51 @@ export const Storage = {
     return true;
   },
 
+  async fetchCloudFeedback() {
+    try {
+      const res = await fetch('/api/feedback');
+      if (res.ok) {
+        const cloudList = await res.json();
+        if (Array.isArray(cloudList)) {
+          const localList = this.getFeedbackSubmissions();
+          const map = new Map();
+          localList.forEach(item => { if (item.id) map.set(item.id, item); });
+          cloudList.forEach(item => { if (item.id) map.set(item.id, item); });
+          const merged = Array.from(map.values()).sort((a, b) => {
+            const timeA = new Date(a.timestamp || 0).getTime() || 0;
+            const timeB = new Date(b.timestamp || 0).getTime() || 0;
+            return timeB - timeA;
+          });
+          this.saveFeedbackLog(merged);
+          return merged;
+        }
+      }
+    } catch (err) {
+      console.warn('[Sked] Could not fetch cloud feedback:', err);
+    }
+    return this.getFeedbackSubmissions();
+  },
+
   getFeedbackSubmissions() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.FEEDBACK_LOG);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Filter out any legacy dummy mock dobs entry
+          return parsed.filter(item => item.id !== 'fb-seed-dobs');
+        }
       }
     } catch (e) {
       console.error('Error reading feedback log:', e);
     }
-    // Seed with initial feedback if empty
-    this.saveFeedbackLog(DEFAULT_FEEDBACK);
-    return DEFAULT_FEEDBACK;
+    return [];
   },
 
   saveFeedbackLog(list) {
     try {
-      localStorage.setItem(STORAGE_KEYS.FEEDBACK_LOG, JSON.stringify(list));
+      const cleanList = (list || []).filter(item => item.id !== 'fb-seed-dobs');
+      localStorage.setItem(STORAGE_KEYS.FEEDBACK_LOG, JSON.stringify(cleanList));
     } catch (e) {
       console.error('Error saving feedback log:', e);
     }
@@ -363,7 +365,7 @@ export const Storage = {
   saveFeedbackSubmission(entry) {
     const list = this.getFeedbackSubmissions();
     const newEntry = {
-      id: `fb-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      id: entry.id || `fb-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       username: entry.username || 'Anonymous',
       type: entry.type || 'Suggestion',
       message: entry.message || '',
@@ -375,21 +377,33 @@ export const Storage = {
     return newEntry;
   },
 
-  updateFeedbackStatus(id, newStatus) {
+  async updateFeedbackStatus(id, newStatus) {
     const list = this.getFeedbackSubmissions();
     const target = list.find(item => item.id === id);
     if (target) {
       target.status = newStatus;
       this.saveFeedbackLog(list);
+      try {
+        fetch('/api/feedback', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status: newStatus })
+        }).catch(() => {});
+      } catch {}
       return true;
     }
     return false;
   },
 
-  deleteFeedbackItem(id) {
+  async deleteFeedbackItem(id) {
     const list = this.getFeedbackSubmissions();
     const filtered = list.filter(item => item.id !== id);
     this.saveFeedbackLog(filtered);
+    try {
+      fetch(`/api/feedback?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      }).catch(() => {});
+    } catch {}
     return true;
   },
 

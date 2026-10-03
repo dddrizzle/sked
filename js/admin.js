@@ -1,7 +1,6 @@
 // Sked Admin Console - System Diagnostics, AI Status, User Manager, and Feedback Hub
 import { Storage } from './storage.js';
 import { CONFIG } from './config.js';
-import { DEFAULT_ADMIN_SCHEDULE, DEFAULT_DRIZZLE_SCHEDULE } from './samples.js';
 
 export class AdminDashboard {
   constructor(appInstance) {
@@ -169,9 +168,13 @@ export class AdminDashboard {
     });
   }
 
-  renderCurrentTab() {
+  async renderCurrentTab() {
     const mountPoint = this.container.querySelector('#admin-panel-content');
     if (!mountPoint) return;
+
+    if (this.activeTab === 'feedback') {
+      await Storage.fetchCloudFeedback();
+    }
 
     // Update counts on badges
     const userAccounts = Storage.getAllUserAccounts();
@@ -658,11 +661,11 @@ export class AdminDashboard {
 
     // Seed/Create User
     mountPoint.querySelector('#btn-admin-seed-user')?.addEventListener('click', () => {
-      const name = prompt('Enter a new username to create or seed with starter schedule:');
+      const name = prompt('Enter a new username to create:');
       if (name && name.trim()) {
         const clean = name.trim();
-        Storage.setUserSchedule(clean, DEFAULT_DRIZZLE_SCHEDULE);
-        this.app.showToast(`User '${clean}' created with starter schedule.`, 'success');
+        Storage.setUserSchedule(clean, []);
+        this.app.showToast(`User '${clean}' created.`, 'success');
         this.renderCurrentTab();
       }
     });
@@ -699,15 +702,9 @@ export class AdminDashboard {
       btn.addEventListener('click', () => {
         const user = btn.getAttribute('data-user');
         if (!user) return;
-        if (confirm(`Are you sure you want to reset schedule data for user "${user}"?`)) {
-          if (user === 'drizzle') {
-            Storage.setUserSchedule('drizzle', DEFAULT_DRIZZLE_SCHEDULE);
-          } else if (user === 'admin') {
-            Storage.setUserSchedule('admin', DEFAULT_ADMIN_SCHEDULE);
-          } else {
-            Storage.setUserSchedule(user, []);
-          }
-          this.app.showToast(`Schedule for '${user}' has been reset.`, 'success');
+        if (confirm(`Are you sure you want to clear schedule data for user "${user}"?`)) {
+          Storage.setUserSchedule(user, []);
+          this.app.showToast(`Schedule for '${user}' has been cleared.`, 'success');
           this.renderCurrentTab();
         }
       });
@@ -740,16 +737,25 @@ export class AdminDashboard {
             <h3>User Feedback & Suggestions Inbox (${feedbackList.length})</h3>
           </div>
           <div style="display: flex; gap: 0.5rem;">
+            <button id="btn-admin-refresh-feedback" class="btn-action" title="Fetch latest feedback from cloud">
+              <span>↻ Refresh Submissions</span>
+            </button>
             <button id="btn-admin-add-mock-feedback" class="btn-action">
-              <span>+ Add Note / Submission</span>
+              <span>+ Add Note</span>
             </button>
           </div>
         </div>
         <div class="admin-card-body">
-          <p class="admin-card-desc">Review and triage suggestions, feature requests, and bug reports sent by users.</p>
+          <p class="admin-card-desc">Review and triage suggestions, feature requests, and bug reports sent by users across devices.</p>
           
           <div class="feedback-inbox-list">
-            ${feedbackList.map(item => {
+            ${feedbackList.length === 0 ? `
+              <div class="empty-state" style="padding: 3rem 1rem;">
+                <div class="empty-icon">📬</div>
+                <h3>No Feedback Submissions Yet</h3>
+                <p>User feedback and suggestions submitted via the feedback widget will appear here in real time.</p>
+              </div>
+            ` : feedbackList.map(item => {
               const categoryColor = {
                 'Suggestion': 'var(--accent-primary)',
                 'Bug Report': 'var(--accent-rose)',
@@ -791,29 +797,41 @@ export class AdminDashboard {
       </div>
     `;
 
+    // Refresh feedback from cloud
+    mountPoint.querySelector('#btn-admin-refresh-feedback')?.addEventListener('click', async () => {
+      const btn = mountPoint.querySelector('#btn-admin-refresh-feedback');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Syncing...</span>';
+      }
+      await Storage.fetchCloudFeedback();
+      this.app.showToast('Feedback inbox synchronized with cloud.', 'success');
+      this.renderCurrentTab();
+    });
+
     // Status change
     mountPoint.querySelectorAll('.feedback-status-select').forEach(sel => {
-      sel.addEventListener('change', (e) => {
+      sel.addEventListener('change', async (e) => {
         const id = sel.getAttribute('data-id');
         const newStatus = e.target.value;
-        Storage.updateFeedbackStatus(id, newStatus);
+        await Storage.updateFeedbackStatus(id, newStatus);
         this.app.showToast(`Feedback status updated to '${newStatus}'.`, 'success');
       });
     });
 
     // Delete feedback
     mountPoint.querySelectorAll('.delete-feedback-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         if (confirm('Delete this feedback item?')) {
-          Storage.deleteFeedbackItem(id);
+          await Storage.deleteFeedbackItem(id);
           this.renderCurrentTab();
           this.app.showToast('Feedback item removed.', 'success');
         }
       });
     });
 
-    // Add note/mock feedback
+    // Add note
     mountPoint.querySelector('#btn-admin-add-mock-feedback')?.addEventListener('click', () => {
       const msg = prompt('Enter a suggestion or feature note to record:');
       if (msg && msg.trim()) {
@@ -824,7 +842,7 @@ export class AdminDashboard {
           timestamp: new Date().toLocaleString(),
           status: 'Planned'
         });
-        this.app.showToast('Feedback recorded.', 'success');
+        this.app.showToast('Feedback note recorded.', 'success');
         this.renderCurrentTab();
       }
     });
@@ -947,9 +965,9 @@ export class AdminDashboard {
 
     // Reset Admin Schedule
     mountPoint.querySelector('#btn-admin-reset-admin-schedule')?.addEventListener('click', () => {
-      if (confirm('Reset admin schedule to factory default?')) {
-        Storage.setUserSchedule('admin', DEFAULT_ADMIN_SCHEDULE);
-        this.app.showToast('Admin schedule restored to default.', 'success');
+      if (confirm('Clear admin schedule to empty?')) {
+        Storage.setUserSchedule('admin', []);
+        this.app.showToast('Admin schedule cleared.', 'success');
       }
     });
   }

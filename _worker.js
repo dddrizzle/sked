@@ -70,8 +70,87 @@ export default {
       });
     }
 
-    // API Route: Forward suggestions & feedback to Discord Webhook
+    // API Route: Feedback & Suggestions (KV persistence + Discord Webhook forwarding)
     if (url.pathname === '/api/feedback') {
+      const FEEDBACK_KV_KEY = '__sked_feedback_log__';
+
+      // GET: Retrieve all feedback submissions from Cloudflare KV
+      if (request.method === 'GET') {
+        if (!env.SKED_KV) {
+          return new Response('[]', {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store, no-cache, must-revalidate'
+            }
+          });
+        }
+        try {
+          const raw = await env.SKED_KV.get(FEEDBACK_KV_KEY);
+          return new Response(raw || '[]', {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store, no-cache, must-revalidate'
+            }
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // PATCH: Update feedback status
+      if (request.method === 'PATCH') {
+        if (!env.SKED_KV) {
+          return new Response(JSON.stringify({ success: true, localOnly: true }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        try {
+          const { id, status } = await request.json();
+          const raw = await env.SKED_KV.get(FEEDBACK_KV_KEY);
+          let list = raw ? JSON.parse(raw) : [];
+          const target = list.find(item => item.id === id);
+          if (target) {
+            target.status = status;
+            await env.SKED_KV.put(FEEDBACK_KV_KEY, JSON.stringify(list));
+          }
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // DELETE: Remove feedback submission
+      if (request.method === 'DELETE') {
+        const id = url.searchParams.get('id');
+        if (!env.SKED_KV || !id) {
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        try {
+          const raw = await env.SKED_KV.get(FEEDBACK_KV_KEY);
+          let list = raw ? JSON.parse(raw) : [];
+          list = list.filter(item => item.id !== id);
+          await env.SKED_KV.put(FEEDBACK_KV_KEY, JSON.stringify(list));
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       if (request.method !== 'POST') {
         return new Response(JSON.stringify({ error: 'Method not allowed' }), {
           status: 405,
@@ -90,6 +169,29 @@ export default {
           });
         }
 
+        // 1. Create and persist feedback entry to Cloudflare KV
+        const newEntry = {
+          id: `fb-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          username: username ? String(username).trim() : 'Anonymous',
+          type: type || 'Suggestion',
+          message: message.trim(),
+          timestamp: new Date().toLocaleString(),
+          status: 'New'
+        };
+
+        if (env.SKED_KV) {
+          try {
+            const raw = await env.SKED_KV.get(FEEDBACK_KV_KEY);
+            let list = raw ? JSON.parse(raw) : [];
+            list.unshift(newEntry);
+            if (list.length > 300) list = list.slice(0, 300);
+            await env.SKED_KV.put(FEEDBACK_KV_KEY, JSON.stringify(list));
+          } catch (kvErr) {
+            console.error('Failed to persist feedback to Cloudflare KV:', kvErr);
+          }
+        }
+
+        // 2. Forward to Discord Webhook
         const webhookUrl = env.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1555612420209119413/iidcmn2G24X22q9P1l-CO8o4TwfD99cgTiwSmg-HT1Lfv-5LMv_QugC58y9Aarfs167h';
 
         const colorMap = {
@@ -131,21 +233,23 @@ export default {
           ]
         };
 
-        const discordRes = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(discordBody)
-        });
-
-        if (!discordRes.ok) {
-          const errText = await discordRes.text();
-          return new Response(JSON.stringify({ error: `Discord returned ${discordRes.status}: ${errText}` }), {
-            status: 502,
-            headers: { 'Content-Type': 'application/json' }
+        let discordError = null;
+        try {
+          const discordRes = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(discordBody)
           });
+
+          if (!discordRes.ok) {
+            const errText = await discordRes.text();
+            discordError = `Discord status ${discordRes.status}: ${errText}`;
+          }
+        } catch (dErr) {
+          discordError = dErr.message;
         }
 
-        return new Response(JSON.stringify({ success: true }), {
+        return new Response(JSON.stringify({ success: true, item: newEntry, discordError }), {
           headers: { 'Content-Type': 'application/json' }
         });
       } catch (err) {
