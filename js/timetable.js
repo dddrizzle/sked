@@ -184,9 +184,14 @@ export function renderTimetable(events, containerEl, options = {}) {
           <div class="event-tags-row">
             ${ev.category ? `<span class="event-category-tag">${escapeHtml(ev.category)}</span>` : ''}
             ${dateHtml}
+            ${ev.url ? `<a href="${escapeHtml(ev.url)}" target="_blank" rel="noopener noreferrer" class="event-url-chip" title="Open resource / submission bin: ${escapeHtml(ev.url)}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg><span>Link ↗</span></a>` : ''}
           </div>
         </div>
       `;
+
+      eventBlock.querySelector('.event-url-chip')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
 
       eventBlock.addEventListener('click', () => {
         if (onEditEvent) onEditEvent(ev);
@@ -252,64 +257,80 @@ export function renderAgenda(events, containerEl, options = {}) {
       .filter(e => e.days && e.days.includes(day))
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-    if (dayEvents.length === 0) return;
-
     const isToday = day === todayCode;
+
+    // For other days, skip if empty. For TODAY, always render so the user sees today's highlighted agenda!
+    if (dayEvents.length === 0 && !isToday) return;
+
     const daySection = document.createElement('div');
     daySection.className = `agenda-day-section ${isToday ? 'is-today' : ''}`;
+
+    const countLabel = dayEvents.length === 0
+      ? '<span class="agenda-day-count free">0 items</span>'
+      : `<span class="agenda-day-count">${dayEvents.length} ${dayEvents.length === 1 ? 'item' : 'items'}</span>`;
 
     daySection.innerHTML = `
       <div class="agenda-day-header">
         <h4>${DAY_LABELS[day]} ${isToday ? '<span class="agenda-today-pill">Today</span>' : ''}</h4>
-        <span class="agenda-day-count">${dayEvents.length} ${dayEvents.length === 1 ? 'item' : 'items'}</span>
+        ${countLabel}
       </div>
       <div class="agenda-events-list"></div>
     `;
 
     const listEl = daySection.querySelector('.agenda-events-list');
 
-    dayEvents.forEach(ev => {
-      const item = document.createElement('div');
-      item.className = 'agenda-event-card';
-      if (ev.isDeadline) item.classList.add('is-deadline');
-      if (ev.recurring === false) item.classList.add('is-one-time');
-
-      item.style.borderLeftColor = ev.color || '#6366f1';
-
-      const timeRange = `${formatTime(ev.startTime, timeFormat)} – ${formatTime(ev.endTime, timeFormat)}`;
-
-      let repeatLabel = '';
-      if (ev.isDeadline) {
-        repeatLabel = '<span class="agenda-type-badge deadline">Deadline</span>';
-      } else if (ev.recurring === false) {
-        repeatLabel = '<span class="agenda-type-badge onetime">One-Time</span>';
-      }
-
-      const dateMeta = ev.date ? `<div class="agenda-card-date">Date: ${escapeHtml(ev.date)}</div>` : '';
-
-      item.innerHTML = `
-        <div class="agenda-card-time">
-          <span>${timeRange}</span>
-          ${repeatLabel}
-        </div>
-        <div class="agenda-card-body">
-          <div class="agenda-card-title">${escapeHtml(ev.title)}</div>
-          ${dateMeta}
-          ${ev.location ? `<div class="agenda-card-meta">Location: ${escapeHtml(ev.location)}</div>` : ''}
-          ${ev.notes ? `<div class="agenda-card-notes">${escapeHtml(ev.notes)}</div>` : ''}
-          ${ev.category ? `<span class="event-category-tag" style="background-color: ${ev.color}22; color: ${ev.color}">${escapeHtml(ev.category)}</span>` : ''}
-        </div>
-        <div class="agenda-card-actions">
-          <button class="btn-agenda-action edit" data-id="${ev.id}">Edit</button>
-          <button class="btn-agenda-action delete" data-id="${ev.id}">Delete</button>
+    if (dayEvents.length === 0 && isToday) {
+      listEl.innerHTML = `
+        <div class="agenda-free-day-card">
+          <span class="free-day-icon">✨</span>
+          <div class="free-day-text">No commitments scheduled for today. Enjoy your day!</div>
         </div>
       `;
+    } else {
+      dayEvents.forEach(ev => {
+        const item = document.createElement('div');
+        item.className = 'agenda-event-card';
+        if (ev.isDeadline) item.classList.add('is-deadline');
+        if (ev.recurring === false) item.classList.add('is-one-time');
 
-      item.querySelector('.edit')?.addEventListener('click', () => onEditEvent && onEditEvent(ev));
-      item.querySelector('.delete')?.addEventListener('click', () => onDeleteEvent && onDeleteEvent(ev.id));
+        item.style.borderLeftColor = ev.color || '#6366f1';
 
-      listEl.appendChild(item);
-    });
+        const timeRange = `${formatTime(ev.startTime, timeFormat)} – ${formatTime(ev.endTime, timeFormat)}`;
+
+        let repeatLabel = '';
+        if (ev.isDeadline) {
+          repeatLabel = '<span class="agenda-type-badge deadline">Deadline</span>';
+        } else if (ev.recurring === false) {
+          repeatLabel = '<span class="agenda-type-badge onetime">One-Time</span>';
+        }
+
+        const dateMeta = ev.date ? `<div class="agenda-card-date">Date: ${escapeHtml(ev.date)}</div>` : '';
+
+        item.innerHTML = `
+          <div class="agenda-card-time">
+            <span>${timeRange}</span>
+            ${repeatLabel}
+          </div>
+          <div class="agenda-card-body">
+            <div class="agenda-card-title">${escapeHtml(ev.title)}</div>
+            ${dateMeta}
+            ${ev.location ? `<div class="agenda-card-meta">Location: ${escapeHtml(ev.location)}</div>` : ''}
+            ${ev.notes ? `<div class="agenda-card-notes">${escapeHtml(ev.notes)}</div>` : ''}
+            ${ev.url ? `<div class="agenda-card-url"><a href="${escapeHtml(ev.url)}" target="_blank" rel="noopener noreferrer" class="agenda-redirect-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg><span>Open Submission Bin / Doc ↗</span></a></div>` : ''}
+            ${ev.category ? `<span class="event-category-tag" style="background-color: ${ev.color}22; color: ${ev.color}">${escapeHtml(ev.category)}</span>` : ''}
+          </div>
+          <div class="agenda-card-actions">
+            <button class="btn-agenda-action edit" data-id="${ev.id}">Edit</button>
+            <button class="btn-agenda-action delete" data-id="${ev.id}">Delete</button>
+          </div>
+        `;
+
+        item.querySelector('.edit')?.addEventListener('click', () => onEditEvent && onEditEvent(ev));
+        item.querySelector('.delete')?.addEventListener('click', () => onDeleteEvent && onDeleteEvent(ev.id));
+
+        listEl.appendChild(item);
+      });
+    }
 
     agendaWrapper.appendChild(daySection);
   });

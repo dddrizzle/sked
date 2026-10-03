@@ -23,3 +23,6 @@ desktop.ini
 dist/
 *.zip
 
+# Local dev mock database
+.local_data/
+

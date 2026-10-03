@@ -1,9 +1,8 @@
-// Sked AI - Application Orchestrator with Multimodal Vision, Deadlines & Clean Professional UI
-
 import { Storage } from './storage.js';
 import { parseScheduleWithGemini } from './gemini.js';
 import { renderTimetable, renderAgenda, formatTime } from './timetable.js';
 import { exportToImage, exportToIcs, exportToCsv, exportToJson } from './exporter.js';
+import { AdminDashboard } from './admin.js';
 
 class SkedApp {
   constructor() {
@@ -11,6 +10,7 @@ class SkedApp {
     this.events = [];
     this.settings = Storage.getSettings();
     this.activeTab = 'weekly';
+    this.adminDashboard = new AdminDashboard(this);
 
     // Image state
     this.uploadedImages = []; // Array of { id, name, size, type, base64, dataUrl }
@@ -27,11 +27,15 @@ class SkedApp {
     this.loginView = document.getElementById('login-view');
     this.formLogin = document.getElementById('form-login');
     this.loginUsernameInput = document.getElementById('login-username-input');
+    this.loginPasscodeGroup = document.getElementById('login-passcode-group');
+    this.loginPasscodeInput = document.getElementById('login-passcode-input');
     this.loginErrorMsg = document.getElementById('login-error-msg');
 
     // 2. Main App View Elements
     this.appView = document.getElementById('app-view');
+    this.adminView = document.getElementById('admin-view');
     this.currentUsernameDisplay = document.getElementById('current-username-display');
+    this.btnAdminConsole = document.getElementById('btn-admin-console');
     this.btnLogout = document.getElementById('btn-logout');
 
     // Prompt & Image Upload Elements
@@ -247,15 +251,29 @@ class SkedApp {
       this.handleLoginSubmit();
     });
 
-    // Real-time input validation: disallow special characters
+    // Real-time input validation: disallow special characters & toggle passcode
     this.loginUsernameInput.addEventListener('input', () => {
-      const val = this.loginUsernameInput.value;
+      const val = this.loginUsernameInput.value.trim();
       if (val && !/^[a-zA-Z0-9]+$/.test(val)) {
         this.showLoginError('Special characters and spaces are not allowed. Only letters and numbers.');
       } else {
         this.clearLoginError();
       }
+
+      if (val.toLowerCase() === 'admin') {
+        if (this.loginPasscodeGroup) {
+          this.loginPasscodeGroup.style.display = 'block';
+        }
+      } else {
+        if (this.loginPasscodeGroup) {
+          this.loginPasscodeGroup.style.display = 'none';
+          if (this.loginPasscodeInput) this.loginPasscodeInput.value = '';
+        }
+      }
     });
+
+    // Admin Console Button
+    this.btnAdminConsole?.addEventListener('click', () => this.openAdminView());
 
     // Logout / Switch User
     this.btnLogout.addEventListener('click', () => this.logout());
@@ -404,6 +422,22 @@ class SkedApp {
       return;
     }
 
+    // Admin Passcode Verification
+    if (rawValue.toLowerCase() === 'admin') {
+      if (this.loginPasscodeGroup) this.loginPasscodeGroup.style.display = 'block';
+      const enteredPasscode = this.loginPasscodeInput ? this.loginPasscodeInput.value : '';
+      if (!enteredPasscode) {
+        this.showLoginError('Admin passcode is required. (Default: skedadmin)');
+        this.loginPasscodeInput?.focus();
+        return;
+      }
+      if (!Storage.validateAdminPasscode(enteredPasscode)) {
+        this.showLoginError('Incorrect admin passcode. Try default "skedadmin".');
+        this.loginPasscodeInput?.focus();
+        return;
+      }
+    }
+
     this.clearLoginError();
     this.executeLogin(rawValue);
   }
@@ -412,7 +446,8 @@ class SkedApp {
     const cleanUser = Storage.setCurrentUser(username);
     this.currentUser = cleanUser;
     this.loadUserSession(cleanUser);
-    this.showToast(`Logged in as ${cleanUser}`, 'success');
+    const label = cleanUser === 'drizzle' ? '💙 drizzle' : (cleanUser === 'xyz' ? '💛 xyz' : cleanUser);
+    this.showToast(`Logged in as ${label}`, 'success');
   }
 
   async loadUserSession(username) {
@@ -426,10 +461,22 @@ class SkedApp {
     }));
 
     if (this.currentUsernameDisplay) {
-      this.currentUsernameDisplay.textContent = username;
+      if (username === 'drizzle') {
+        this.currentUsernameDisplay.innerHTML = '<span class="user-heart-icon heart-blue" title="drizzle">💙</span> drizzle';
+      } else if (username === 'xyz') {
+        this.currentUsernameDisplay.innerHTML = '<span class="user-heart-icon heart-yellow" title="xyz">💛</span> xyz';
+      } else {
+        this.currentUsernameDisplay.textContent = username;
+      }
+    }
+
+    // Show or hide the Admin Console button based on user identity
+    if (this.btnAdminConsole) {
+      this.btnAdminConsole.style.display = (username.toLowerCase() === 'admin') ? 'inline-flex' : 'none';
     }
 
     this.loginView.style.display = 'none';
+    if (this.adminView) this.adminView.style.display = 'none';
     this.appView.style.display = 'block';
 
     this.renderAllViews();
@@ -453,16 +500,40 @@ class SkedApp {
     }
   }
 
+  openAdminView() {
+    if (this.appView) this.appView.style.display = 'none';
+    if (this.adminView) {
+      this.adminView.style.display = 'block';
+      this.adminDashboard.mount(this.adminView);
+    }
+  }
+
+  closeAdminView() {
+    if (this.adminView) this.adminView.style.display = 'none';
+    if (this.appView) {
+      this.appView.style.display = 'block';
+      this.renderAllViews();
+    }
+  }
+
   logout() {
     Storage.clearCurrentUser();
     this.currentUser = null;
     this.events = [];
     this.clearUploadedImages();
+    if (this.adminView) this.adminView.style.display = 'none';
+    if (this.btnAdminConsole) this.btnAdminConsole.style.display = 'none';
     this.showLoginView();
     this.showToast('Logged out.', 'success');
   }
 
   showLoginView() {
+    if (this.adminView) this.adminView.style.display = 'none';
+    if (this.btnAdminConsole) this.btnAdminConsole.style.display = 'none';
+    if (this.loginPasscodeGroup) {
+      this.loginPasscodeGroup.style.display = 'none';
+      if (this.loginPasscodeInput) this.loginPasscodeInput.value = '';
+    }
     this.appView.style.display = 'none';
     this.loginView.style.display = 'flex';
     this.loginUsernameInput.value = '';
@@ -526,7 +597,8 @@ class SkedApp {
         images: this.uploadedImages.map(img => ({
           base64: img.base64,
           mimeType: img.type
-        }))
+        })),
+        currentUser: this.currentUser
       };
 
       const extractedEvents = await parseScheduleWithGemini(inputPayload);
@@ -593,20 +665,25 @@ class SkedApp {
       const dateDisplay = ev.date ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${ev.date}</div>` : '';
 
       tr.innerHTML = `
-        <td style="font-weight: 700;">
-          <span class="color-dot" style="background-color: ${ev.color || '#6366f1'}"></span>
-          ${this.escape(ev.title)}
+        <td class="cell-event-title" title="${this.escape(ev.title)}">
+          <div class="table-title-row">
+            <span class="color-dot" style="background-color: ${ev.color || '#6366f1'}"></span>
+            <span class="event-title-text">${this.escape(ev.title)}</span>
+          </div>
         </td>
-        <td>${typeLabel}</td>
-        <td>
+        <td class="cell-type">${typeLabel}</td>
+        <td class="cell-days">
           ${daysHtml}
           ${dateDisplay}
         </td>
-        <td style="font-family: var(--font-mono); font-size: 0.82rem;">${timeRange}</td>
-        <td><span class="event-category-tag" style="background: ${ev.color}22; color: ${ev.color}">${this.escape(ev.category)}</span></td>
-        <td>${this.escape(ev.location) || '<span style="color: var(--text-muted);">-</span>'}</td>
-        <td style="font-size: 0.8rem; color: var(--text-secondary);">${this.escape(ev.notes) || '<span style="color: var(--text-muted);">-</span>'}</td>
-        <td style="text-align: right;">
+        <td class="cell-time" style="font-family: var(--font-mono); font-size: 0.82rem;">${timeRange}</td>
+        <td class="cell-cat"><span class="event-category-tag" style="background: ${ev.color}22; color: ${ev.color}">${this.escape(ev.category)}</span></td>
+        <td class="cell-location" title="${this.escape(ev.location)}">${this.escape(ev.location) || '<span style="color: var(--text-muted);">-</span>'}</td>
+        <td class="cell-notes" title="${this.escape(ev.notes)}">${this.escape(ev.notes) || '<span style="color: var(--text-muted);">-</span>'}</td>
+        <td class="cell-link">
+          ${ev.url ? `<a href="${this.escape(ev.url)}" target="_blank" rel="noopener noreferrer" class="table-link-chip" title="${this.escape(ev.url)}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg> <span>Open ↗</span></a>` : '<span style="color: var(--text-muted);">-</span>'}
+        </td>
+        <td class="cell-actions" style="text-align: right;">
           <button class="btn-agenda-action edit-btn" style="margin-right: 4px;">Edit</button>
           <button class="btn-agenda-action delete-btn" style="color: var(--accent-rose);">Delete</button>
         </td>
@@ -647,6 +724,7 @@ class SkedApp {
     document.getElementById('event-start-time').value = '09:00';
     document.getElementById('event-end-time').value = '10:00';
     document.getElementById('event-color').value = '#6366f1';
+    document.getElementById('event-url').value = '';
     this.selectRepeatType.value = 'weekly';
     this.groupEventDate.style.display = 'none';
     this.inputEventDate.value = '';
@@ -673,6 +751,7 @@ class SkedApp {
     document.getElementById('event-color').value = ev.color || '#6366f1';
     document.getElementById('event-location').value = ev.location || '';
     document.getElementById('event-notes').value = ev.notes || '';
+    document.getElementById('event-url').value = ev.url || '';
 
     if (this.btnDeleteModalEvent) {
       this.btnDeleteModalEvent.style.display = 'inline-flex';
@@ -716,6 +795,7 @@ class SkedApp {
     const color = document.getElementById('event-color').value;
     const location = document.getElementById('event-location').value.trim();
     const notes = document.getElementById('event-notes').value.trim();
+    const url = (document.getElementById('event-url').value || '').trim();
 
     const repeatType = this.selectRepeatType.value;
     const recurring = repeatType === 'weekly';
@@ -744,7 +824,8 @@ class SkedApp {
       category,
       color,
       location,
-      notes
+      notes,
+      url
     };
 
     const existingIndex = this.events.findIndex(e => e && String(e.id) === String(id));
@@ -817,6 +898,15 @@ class SkedApp {
     this.btnSubmitFeedback.innerHTML = '<span class="spinner"></span> <span>Sending...</span>';
 
     try {
+      // Log to local feedback inbox for Admin Hub
+      Storage.saveFeedbackSubmission({
+        username,
+        type,
+        message: msg,
+        timestamp: new Date().toLocaleString(),
+        status: 'New'
+      });
+
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

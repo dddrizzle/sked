@@ -124,3 +124,46 @@ export const DEFAULT_ADMIN_SCHEDULE = [
     notes: "Weekly retrospective & milestones"
   }
 ];
+
+// Default schedule for user: "xyz"
+export const DEFAULT_XYZ_SCHEDULE = [
+  {
+    id: "xyz-1",
+    title: "Design Critique & Creative Sync",
+    days: ["Mon", "Wed"],
+    recurring: true,
+    isDeadline: false,
+    startTime: "10:00",
+    endTime: "11:30",
+    category: "Work",
+    color: "#eab308",
+    location: "Creative Studio Hall",
+    notes: "Reviewing UI/UX wireframes and interaction flows"
+  },
+  {
+    id: "xyz-2",
+    title: "Applied AI & Neural Systems",
+    days: ["Tue", "Thu"],
+    recurring: true,
+    isDeadline: false,
+    startTime: "14:00",
+    endTime: "15:45",
+    category: "Academic",
+    color: "#f59e0b",
+    location: "Science Complex 201",
+    notes: "Transformer models and attention mechanisms"
+  },
+  {
+    id: "xyz-3",
+    title: "Casual Coffee & Strategy",
+    days: ["Fri"],
+    recurring: true,
+    isDeadline: false,
+    startTime: "16:00",
+    endTime: "17:15",
+    category: "Social",
+    color: "#10b981",
+    location: "Artisan Lounge",
+    notes: "Weekend team catchup and project brainstorming"
+  }
+];

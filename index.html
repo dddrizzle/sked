@@ -56,6 +56,23 @@
             </span>
           </div>
 
+          <!-- Conditional Admin Passcode Field -->
+          <div class="form-group" id="login-passcode-group" style="display: none;">
+            <label for="login-passcode-input" class="login-passcode-label">
+              <span class="lock-icon">🔒</span>
+              <span>Admin Passcode Required</span>
+            </label>
+            <div class="login-input-wrapper">
+              <input 
+                type="password" 
+                id="login-passcode-input" 
+                class="form-control login-input" 
+                placeholder="Enter admin passcode" 
+                autocomplete="current-password"
+              >
+            </div>
+          </div>
+
           <button type="submit" id="btn-login-submit" class="btn-primary btn-login-submit">
             <span>Enter Timetable</span>
           </button>
@@ -88,6 +105,15 @@
         </div>
 
         <div class="header-actions">
+          <!-- Admin Console Button (Visible when logged in as admin) -->
+          <button id="btn-admin-console" class="btn-header btn-admin-console" style="display: none;" title="Open Sked Admin Control Center">
+            <span class="admin-pulse-dot"></span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <span>Admin Console</span>
+          </button>
+
           <!-- Personalized User Badge -->
           <div class="user-profile-badge">
             <span class="user-label-text">Profile:</span>
@@ -228,6 +254,7 @@
                   <th>Category</th>
                   <th>Location</th>
                   <th>Notes</th>
+                  <th>Link / Bin</th>
                   <th style="text-align: right;">Actions</th>
                 </tr>
               </thead>
@@ -255,6 +282,9 @@
     </main>
 
   </div>
+
+  <!-- ==================== 3. ADMIN CONTROL CENTER VIEW ==================== -->
+  <div id="admin-view" class="admin-view-wrapper" style="display: none;"></div>
 
   <!-- Event Add / Edit Modal -->
   <div id="modal-event" class="modal-backdrop">
@@ -339,6 +369,11 @@
         <div class="form-group">
           <label for="event-notes">Notes / Details</label>
           <input type="text" id="event-notes" class="form-control" placeholder="e.g. Prof. Miller, Section A">
+        </div>
+
+        <div class="form-group">
+          <label for="event-url">Resource / Submission Link (URL)</label>
+          <input type="url" id="event-url" class="form-control" placeholder="e.g. Canvas submission bin, Google Docs, syllabus PDF link">
         </div>
 
         <div class="modal-footer" style="margin-top: 1rem;">

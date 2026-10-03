@@ -110,6 +110,7 @@ export function exportToIcs(events, filename = 'sked-schedule.ics') {
     if (ev.location) icsContent.push(`LOCATION:${escapeIcs(ev.location)}`);
     if (ev.notes) icsContent.push(`DESCRIPTION:${escapeIcs(ev.notes)}`);
     if (ev.category) icsContent.push(`CATEGORIES:${escapeIcs(ev.category)}`);
+    if (ev.url) icsContent.push(`URL:${escapeIcs(ev.url)}`);
     icsContent.push('END:VEVENT');
   });
 
@@ -128,7 +129,7 @@ export function exportToJson(events, filename = 'sked-data.json') {
 
 // Export CSV
 export function exportToCsv(events, filename = 'sked-schedule.csv') {
-  const headers = ['Title', 'Days', 'Start Time', 'End Time', 'Category', 'Location', 'Notes'];
+  const headers = ['Title', 'Days', 'Start Time', 'End Time', 'Category', 'Location', 'Notes', 'Link / URL'];
   const rows = events.map(ev => [
     `"${(ev.title || '').replace(/"/g, '""')}"`,
     `"${(ev.days || []).join(', ')}"`,
@@ -136,7 +137,8 @@ export function exportToCsv(events, filename = 'sked-schedule.csv') {
     `"${ev.endTime}"`,
     `"${(ev.category || '').replace(/"/g, '""')}"`,
     `"${(ev.location || '').replace(/"/g, '""')}"`,
-    `"${(ev.notes || '').replace(/"/g, '""')}"`
+    `"${(ev.notes || '').replace(/"/g, '""')}"`,
+    `"${(ev.url || '').replace(/"/g, '""')}"`
   ]);
 
   const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
