@@ -17,6 +17,7 @@ class SkedApp {
 
     this.initElements();
     this.initTheme();
+    this.initLiveClock();
     this.initImageUpload();
     this.initEventListeners();
     this.checkAuthState();
@@ -109,6 +110,65 @@ class SkedApp {
     if (this.currentUser) {
       this.renderAllViews();
     }
+  }
+
+  initLiveClock() {
+    this.clockFormat = Storage.getClockFormat();
+
+    const headerClock = document.getElementById('header-clock');
+    if (headerClock) {
+      headerClock.addEventListener('click', () => {
+        this.clockFormat = (this.clockFormat === '24h') ? '12h' : '24h';
+        Storage.setClockFormat(this.clockFormat);
+        this.updateLiveClock();
+        this.showToast(`Clock format switched to ${this.clockFormat === '24h' ? '24-hour' : '12-hour'}.`, 'info');
+      });
+    }
+
+    this.updateLiveClock();
+    setInterval(() => this.updateLiveClock(), 1000);
+  }
+
+  updateLiveClock() {
+    const now = new Date();
+    const clockTimeEls = document.querySelectorAll('.clock-time-val');
+    const clockAmpmEls = document.querySelectorAll('.clock-ampm-val');
+    const clockDayEls = document.querySelectorAll('.clock-day-val');
+    const clockDateEls = document.querySelectorAll('.clock-date-val');
+
+    if (clockTimeEls.length === 0) return;
+
+    const use24h = (this.clockFormat === '24h');
+
+    const hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    let timeString = '';
+    let ampm = '';
+
+    if (use24h) {
+      timeString = `${String(hours).padStart(2, '0')}:${minutes}:${seconds}`;
+      ampm = '24H';
+    } else {
+      const displayHours = String(hours % 12 || 12).padStart(2, '0');
+      timeString = `${displayHours}:${minutes}:${seconds}`;
+      ampm = hours >= 12 ? 'PM' : 'AM';
+    }
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[now.getDay()];
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthName = monthNames[now.getMonth()];
+    const dateNum = now.getDate();
+    const year = now.getFullYear();
+    const dateString = `${monthName} ${dateNum}, ${year}`;
+
+    clockTimeEls.forEach(el => { el.textContent = timeString; });
+    clockAmpmEls.forEach(el => { el.textContent = ampm; });
+    clockDayEls.forEach(el => { el.textContent = dayName; });
+    clockDateEls.forEach(el => { el.textContent = dateString; });
   }
 
   initImageUpload() {

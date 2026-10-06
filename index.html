@@ -89,18 +89,44 @@
     <!-- App Header -->
     <header class="app-header">
       <div class="header-container">
-        <div class="brand-wrapper">
-          <div class="logo-badge">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
+        <div class="header-left">
+          <!-- Live Clock & Date Widget -->
+          <div id="header-clock" class="header-clock-widget" title="Live Clock — Click to toggle 12h / 24h format">
+            <div class="clock-live-indicator">
+              <span class="clock-pulse-dot" title="Live clock active"></span>
+              <svg class="clock-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <div class="clock-details">
+              <div class="clock-time-line">
+                <span id="clock-time" class="clock-time-val">--:--:--</span>
+                <span id="clock-ampm" class="clock-ampm-val">--</span>
+              </div>
+              <div class="clock-date-line">
+                <span id="clock-day" class="clock-day-val">---</span>
+                <span class="clock-date-sep">•</span>
+                <span id="clock-date" class="clock-date-val">--- --, ----</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 class="brand-title">Sked</h1>
-            <div class="brand-subtitle">Turn notes & schedules into timetables</div>
+
+          <div class="header-brand-divider"></div>
+
+          <div class="brand-wrapper">
+            <div class="logo-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <div>
+              <h1 class="brand-title">Sked</h1>
+              <div class="brand-subtitle">Turn notes & schedules into timetables</div>
+            </div>
           </div>
         </div>
 

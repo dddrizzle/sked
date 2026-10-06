@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'sked_settings',
   ADMIN_PASSCODE: 'sked_admin_passcode',
   FEEDBACK_LOG: 'sked_feedback_log',
-  DELETED_USERS: 'sked_deleted_users'
+  DELETED_USERS: 'sked_deleted_users',
+  CLOCK_FORMAT: 'sked_clock_format'
 };
 
 const DEFAULT_SETTINGS = {
@@ -154,6 +155,16 @@ export const Storage = {
   setTheme(theme) {
     localStorage.setItem(STORAGE_KEYS.THEME, theme);
     document.documentElement.setAttribute('data-theme', theme);
+  },
+
+  getClockFormat() {
+    return localStorage.getItem(STORAGE_KEYS.CLOCK_FORMAT) || '12h';
+  },
+
+  setClockFormat(format) {
+    const valid = (format === '24h') ? '24h' : '12h';
+    localStorage.setItem(STORAGE_KEYS.CLOCK_FORMAT, valid);
+    return valid;
   },
 
   getSettings() {
